@@ -2,11 +2,10 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 // @ts-ignore
 import scrapeIt from 'scrape-it';
 // @ts-ignore
-import logger from '../../lib/logger.js';
 import qs from 'qs';
 import axiosCookieJarSupport from 'axios-cookiejar-support';
 import tough from 'tough-cookie';
-import { Contest, User, Challenge } from './BasicTypes';
+import { Contest, User, Challenge, SolvedInfo } from './BasicTypes';
 
 export interface profileTW{
   username: string,
@@ -15,7 +14,7 @@ export interface profileTW{
   score: string,
   comment: string,
   registeredAt: string,
-  solvedChalls: Challenge[],
+  solvedChalls: SolvedInfo[],
 }
 
 const getAxiosClientTW = () => {
@@ -49,8 +48,9 @@ let csrftoken = '';
 let sessionidTW = '';
 
 const parseProfileTW = async (html: any) => {
-  const { fetchedProfile } = await scrapeIt.scrapeHTML<{ fetchedProfile: profileTW[] }>(html, {
-    fetchedProfile: {
+  // Parse profile except for solved challs.
+  const { fetchedBasicProfile } = await scrapeIt.scrapeHTML<{ fetchedBasicProfile: profileTW[] }>(html, {
+    fetchedBasicProfile: {
       listItem: 'div.col-md-8 > div.row > div.col-md-9',
       data: {
         username: {
@@ -80,7 +80,39 @@ const parseProfileTW = async (html: any) => {
       },
     }
   });
-  return fetchedProfile[0];
+  const fetchedProfile: profileTW = {
+    ...fetchedBasicProfile[0],
+  }
+
+  // Parse solved challs.
+  const { solvedChalls } = await scrapeIt.scrapeHTML<{ solvedChalls: SolvedInfo[] }>(html, {
+    solvedChalls: {
+      listItem: 'table > tbody > tr',
+      data: {
+        id: {
+          selector: 'td > a',
+          attr: 'href',
+          convert: (url_challenge) => url_challenge.substring('/challenge/#'.length, url_challenge.lenth),
+        },
+        name: {
+          selector: 'td > a',
+        },
+        solvedAt: {
+          selector: 'td',
+          eq: 3,
+          convert: (str_date) => new Date(str_date),
+        },
+        score: {
+          selector: 'td',
+          eq: 2,
+          convert: (str_score) => Number(str_score),
+        }
+      }
+    }
+  });
+  fetchedProfile.solvedChalls = solvedChalls;
+
+  return fetchedProfile;
 }
 
 
@@ -121,10 +153,10 @@ const loginTW = async () => {
 
 
 
-export async function fetchUserProfile(idCtf: string){
+export async function fetchUserProfile(userId: string){
   await loginTW();
   try {
-    const { data: html } = await clientTW.get(`https://pwnable.tw/user/${idCtf}`, {
+    const { data: html } = await clientTW.get(`https://pwnable.tw/user/${userId}`, {
       headers: {
         Cookie: sessionidTW,
       },

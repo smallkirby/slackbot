@@ -19,5 +19,11 @@ export interface Challenge {
   id: string,           // determined by the site
   name: string,
   score: number,        // score of the chall
-  solvedBy: string[],   // IDs of Users who solve the chall
+}
+
+export interface SolvedInfo{
+  id: string,           // challenge id
+  solvedAt: Date,       //
+  name: string,
+  score: number,
 }

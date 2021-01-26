@@ -33,22 +33,6 @@ export async function fetchChallsXYZ(){
       },
     }
   });
-  logger.info(`pwnable.xyz has ${fetchedChalls.length} challs.`);
 
-  //// register challenges
-  //const oldxyz = state.contests.find((({ title }) => title == 'pwnable.xyz'));
-  //const updatedxyz: Contest = {
-  //  url: 'https://pwnable.xyz',
-  //  id: 1,  // XXX
-  //  title: 'pwnable.xyz',
-  //  alias: !oldxyz ? ['xyz'] : oldxyz.alias,
-  //  joiningUsers: !oldxyz ? [] : oldxyz.joiningUsers,
-  //  numChalls: fetchedChalls.length,
-  //}
-  //if (!oldxyz) {
-  //  state.contests.push(updatedxyz);
-  //} else {
-  //  state.contests.map(cont => cont.id === updatedxyz.id ? updatedxyz : cont);
-  //}
-  //setState(state);
+  return fetchedChalls;
 };
