@@ -10,6 +10,10 @@ import { getMemberIcon, getMemberName } from '../lib/slackUtils';
 import { fetchUserProfile, fetchChallsTW } from './lib/TWManager';
 import { fetchChallsXYZ } from './lib/XYZManager';
 import { Contest, User, Challenge, SolvedInfo } from './lib/BasicTypes';
+import { Mutex } from 'async-mutex';
+import schedule from 'node-schedule';
+
+const mutex = new Mutex();
 
 // Record of already added Site Information and Users
 interface State {
@@ -25,7 +29,7 @@ const getContestSummary = async (contest: Contest) => {
     text += `  参加者: なし\n`
   } else {
     text += `  参加者: ${contest.joiningUsers.length}匹\n`;
-    for (let user of contest.joiningUsers) {
+    for (const user of contest.joiningUsers) {
       //text += await getMemberIcon(user.slackId) + ' '; //XXX
       text += '   ' + user.slackId + ' ';
     }
@@ -34,9 +38,15 @@ const getContestSummary = async (contest: Contest) => {
   return text;
 }
 
+const filterChallSolvedRecent = (challs: SolvedInfo[], day: number) => {
+  const limitdate = Date.now() - day * 1000 * 60 * 60 * 24;
+  const filteredChalls = challs.filter((chall) => chall.solvedAt.getTime() >= limitdate);
+  return filteredChalls;
+}
+
 const getChallsSummary = (challs: SolvedInfo[], spaces = 0) => {
   let text = '';
-  for (let chall of challs) {
+  for (const chall of challs) {
     text += " ".repeat(spaces);
     text += `${chall.name}(${chall.score}) ${chall.solvedAt.toLocaleString()}\n`;
   }
@@ -242,6 +252,9 @@ ${getChallsSummary(fetchedProfile.solvedChalls, 2)}
           }
         }
 
+      } else if (args[0] == 'debug') {
+        postDaily();
+
       // unknown command
       } else {
         await postMessageDefault(message, { text: ':wakarazu:' });
@@ -280,7 +293,50 @@ ${getChallsSummary(fetchedProfile.solvedChalls, 2)}
     await slack.chat.postMessage(postingConfig);
   }
 
+  const postDaily = async () => {
+    // for now, retrieve only TW. // XXX
+    for (const contest of state.contests) {
+      let text = '';
+      if (contest.id == 0) { // TW
+        text += `*${state.contests.find((contest) => contest.id == 0).title}*\n`;
+        const allRecentSolves: {slackid: string, solves: SolvedInfo[]}[] = [];
+        const users = contest.joiningUsers;
+        for (const user of users) {
+          const profile = await fetchUserProfile(user.idCtf);
+          const recentSolves = filterChallSolvedRecent(profile.solvedChalls, 1); // XXX
+          allRecentSolves.push({ slackid: user.slackId, solves: recentSolves });
+          console.log(allRecentSolves);
+        }
+
+        for (const solvePerUser of allRecentSolves) {
+          for (const solve of solvePerUser.solves) {
+            text += `*${solvePerUser.slackid}* が *${solve.name}* (${solve.score})を解いたよ :pwn: \n`
+          }
+        }
+        slack.chat.postMessage({
+          username: 'pwnyaa',
+          icon_emoji: ':pwn',
+          channel: process.env.CHANNEL_SANDBOX,
+          text: text,
+        });
+      }
+    }
+  }
+
+  setInterval(() => {
+    mutex.runExclusive(() => {
+      updateChallsTW();
+      updateChallsTW();
+    });
+  }, 30 * 60 * 1000)
+
   // init
   updateChallsTW();
   updateChallsXYZ();
+
+  schedule.scheduleJob('0 9 * * *', () => {
+    mutex.runExclusive(() => {
+      postDaily();
+    })
+  })
 };

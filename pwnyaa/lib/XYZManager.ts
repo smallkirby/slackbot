@@ -2,11 +2,10 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 // @ts-ignore
 import scrapeIt from 'scrape-it';
 // @ts-ignore
-import logger from '../../lib/logger.js';
 import qs from 'qs';
 import axiosCookieJarSupport from 'axios-cookiejar-support';
 import tough from 'tough-cookie';
-import { Contest,Challenge, User } from './BasicTypes';
+import { Contest, User, Challenge, SolvedInfo } from './BasicTypes';
 
 // update challs and solved-state of pwnable.xyz
 export async function fetchChallsXYZ(){
